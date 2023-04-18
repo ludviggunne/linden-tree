@@ -1,3 +1,4 @@
+use std::mem::swap;
 
 #[derive(Debug)]
 pub enum Symbol {
@@ -11,7 +12,8 @@ pub enum Symbol {
 pub type Processor = fn(&Symbol, &mut Vec<Symbol>) -> bool;
 pub struct System {
     processor: Processor,
-    symbols:   Vec<Symbol>,  
+    symbols: Vec<Symbol>,
+    symbols_swap: Vec<Symbol>,
 }
 
 #[repr(C)]
@@ -22,9 +24,12 @@ pub struct Point {
 }
 
 impl System {
-
     pub fn new(processor: Processor) -> System {
-        System { processor: processor, symbols: Vec::new() }
+        System {
+            processor: processor,
+            symbols: Vec::new(),
+            symbols_swap: Vec::new(),
+        }
     }
 
     pub fn init(&mut self, symbols: Vec<Symbol>) {
@@ -32,38 +37,37 @@ impl System {
     }
 
     pub fn step(&mut self) {
-
-        let mut new_symbols = Vec::new();
         for symbol in &self.symbols {
-
-            (self.processor)(&symbol, &mut new_symbols);
+            (self.processor)(&symbol, &mut self.symbols_swap);
         }
 
-        self.symbols = new_symbols;
+        swap(&mut self.symbols, &mut self.symbols_swap);
     }
 
     pub fn gen_vbuf(&self) -> Vec<Point> {
-
         let mut state: (f64, f64, f64) = (0.0, 0.0, -std::f64::consts::PI / 2.0);
         let mut stack = Vec::new();
         let mut output = Vec::new();
 
         for symbol in &self.symbols {
-
             use Symbol::*;
 
             match symbol {
-
                 Push => stack.push(state),
-                Pop =>  state = stack.pop().unwrap(),
+                Pop => state = stack.pop().unwrap(),
                 Turn(a) => state.2 += a,
                 Translate(x) => {
-
-                    output.push(Point { x: state.0 as f32, y: state.1 as f32 });
+                    output.push(Point {
+                        x: state.0 as f32,
+                        y: state.1 as f32,
+                    });
                     state.0 += x * state.2.cos();
                     state.1 += x * state.2.sin();
-                    output.push(Point { x: state.0 as f32, y: state.1 as f32 });
-                },
+                    output.push(Point {
+                        x: state.0 as f32,
+                        y: state.1 as f32,
+                    });
+                }
                 Generic(_) => (),
             }
         }
